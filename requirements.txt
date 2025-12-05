@@ -1,0 +1,8 @@
+streamlit==1.29.0
+pandas==2.1.4
+networkx==3.2.1
+pyvis==0.3.2
+textblob==0.17.1
+vaderSentiment==3.3.2
+numpy==1.26.2
+plotly==5.18.0
