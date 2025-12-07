@@ -219,10 +219,10 @@ def render_risk_alert(stats):
         '''
         st.markdown(create_alert_box(message, "danger"), unsafe_allow_html=True)
     elif stats['positive_pct'] > HEALTHY_CULTURE_PERCENTAGE * 100:
-        message = '''
-        <strong> HEALTHY CULTURE:</strong> Strong positive sentiment across organization. 
-        Continue monitoring and recognize high performers.
-        '''
+        message = (
+            "HEALTHY CULTURE: Strong positive sentiment across organization. "
+            "Continue monitoring and recognize high performers."
+        )
         st.markdown(create_alert_box(message, "success"), unsafe_allow_html=True)
     else:
         message = '''
@@ -318,7 +318,7 @@ def render_risk_profiles_tab(centrality, sender_sentiment):
             return [''] * len(row)
         
         styled_df = top_influencers.style.apply(highlight_risk, axis=1)
-        st.dataframe(styled_df, width='stretch', hide_index=True)
+        st.dataframe(styled_df)
         
         csv = top_influencers.to_csv(index=False).encode('utf-8')
         st.download_button(
@@ -333,68 +333,114 @@ def render_sentiment_trends_tab(df, stats):
     """Render sentiment trends analytics tab."""
     st.markdown("### Sentiment Distribution Analysis")
     
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        fig = create_sentiment_histogram(df)
-        st.plotly_chart(fig, use_container_width='stretch')
-    
-    with col2:
-        st.markdown("#### Statistics")
-        st.metric("Mean", f"{stats['mean']:.3f}")
-        st.metric("Median", f"{stats['median']:.3f}")
-        st.metric("Std Dev", f"{stats['std']:.3f}")
-        st.metric("Q1 (25th)", f"{stats['q1']:.3f}")
-        st.metric("Q3 (75th)", f"{stats['q3']:.3f}")
+    try:
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            if 'sentiment' in df.columns and len(df) > 0:
+                fig = create_sentiment_histogram(df)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("No sentiment data available. Check if sentiment analysis completed.")
+        
+        with col2:
+            st.markdown("#### Statistics")
+            if stats:
+                st.metric("Mean", f"{stats['mean']:.3f}")
+                st.metric("Median", f"{stats['median']:.3f}")
+                st.metric("Std Dev", f"{stats['std']:.3f}")
+                st.metric("Q1 (25th)", f"{stats['q1']:.3f}")
+                st.metric("Q3 (75th)", f"{stats['q3']:.3f}")
+            else:
+                st.error("Statistics not available")
+    except Exception as e:
+        st.error(f"Error rendering sentiment trends: {str(e)}")
 
 
 def render_communication_patterns_tab(df, sender_col):
     """Render communication patterns analytics tab."""
     st.markdown("### Communication Volume Analysis")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### Top 20 Most Active Profiles")
-        top_senders = create_top_senders_chart(df, sender_col)
-        st.bar_chart(top_senders)
-    
-    with col2:
-        st.markdown("#### Workload Distribution")
+    try:
+        if sender_col not in df.columns:
+            st.error(f"Column '{sender_col}' not found in DataFrame. Available columns: {list(df.columns)}")
+            return
+            
+        if len(df) == 0:
+            st.warning("No data available for analysis")
+            return
         
-        workload = calculate_workload_distribution(df, sender_col)
+        col1, col2 = st.columns(2)
         
-        st.metric("Average Emails/Person", f"{workload['avg_volume']:.0f}")
-        st.metric("Overloaded Profiles", f"{workload['overload_count']}")
+        with col1:
+            st.markdown("#### Top 20 Most Active Profiles")
+            try:
+                top_senders = create_top_senders_chart(df, sender_col)
+                if len(top_senders) > 0:
+                    st.bar_chart(top_senders)
+                else:
+                    st.info("No sender data available")
+            except Exception as e:
+                st.error(f"Error creating top senders chart: {str(e)}")
         
-        if workload['overload_count'] > 0:
-            st.markdown("** High Volume Alerts:**")
-            for _, row in workload['overloaded'].head(5).iterrows():
-                st.caption(f"• {row['Profile']}: {row['Email Count']} emails ({row['Email Count']/workload['avg_volume']:.1f}x avg)")
+        with col2:
+            st.markdown("#### Workload Distribution")
+            try:
+                workload = calculate_workload_distribution(df, sender_col)
+                
+                st.metric("Average Emails/Person", f"{workload['avg_volume']:.0f}")
+                st.metric("Overloaded Profiles", f"{workload['overload_count']}")
+                
+                if workload['overload_count'] > 0:
+                    st.markdown("⚠️ **High Volume Alerts:**")
+                    for _, row in workload['overloaded'].head(5).iterrows():
+                        st.caption(f"• {row['Profile']}: {row['Email Count']} emails ({row['Email Count']/workload['avg_volume']:.1f}x avg)")
+            except Exception as e:
+                st.error(f"Error calculating workload: {str(e)}")
+    except Exception as e:
+        st.error(f"Error rendering communication patterns: {str(e)}")
 
 
 def render_deep_insights_tab(df, sender_col):
     """Render deep insights analytics tab."""
     st.markdown("### Deep Dive Insights")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### Network Metrics")
-        # These are already calculated in main, can be passed as parameter
-        st.caption("Available in network analysis section")
-    
-    with col2:
-        st.markdown("#### Communication Efficiency")
-        email_per_person = len(df) / len(df[sender_col].unique())
-        st.metric("Emails per Person", f"{email_per_person:.1f}")
-        st.caption("Communication load distribution")
-    
-    # Sentiment by role type
-    st.markdown("#### Sentiment by Profile Type")
-    role_sentiment = create_sentiment_by_role_chart(df)
-    if role_sentiment is not None:
-        st.bar_chart(role_sentiment)
+    try:
+        if sender_col not in df.columns:
+            st.error(f"Column '{sender_col}' not found in DataFrame")
+            return
+            
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### Network Metrics")
+            st.caption("Available in network analysis section")
+        
+        with col2:
+            st.markdown("#### Communication Efficiency")
+            try:
+                unique_senders = len(df[sender_col].unique())
+                if unique_senders > 0:
+                    email_per_person = len(df) / unique_senders
+                    st.metric("Emails per Person", f"{email_per_person:.1f}")
+                    st.caption("Communication load distribution")
+                else:
+                    st.warning("No unique senders found")
+            except Exception as e:
+                st.error(f"Error calculating efficiency: {str(e)}")
+        
+        # Sentiment by role type
+        st.markdown("#### Sentiment by Profile Type")
+        try:
+            role_sentiment = create_sentiment_by_role_chart(df)
+            if role_sentiment is not None and len(role_sentiment) > 0:
+                st.bar_chart(role_sentiment)
+            else:
+                st.info("No role-based sentiment data available. Roles are extracted from profile names.")
+        except Exception as e:
+            st.error(f"Error creating role sentiment chart: {str(e)}")
+    except Exception as e:
+        st.error(f"Error rendering deep insights: {str(e)}")
 
 
 def render_footer():
@@ -444,16 +490,16 @@ def main():
     all_names = list(set(df['sender_clean'].tolist() + df['receiver_clean'].tolist()))
     anonymization_map = create_anonymization_map(all_names)
     df = apply_anonymization(df, anonymization_map)
-    
+
     # Add sentiment analysis
     if 'sentiment' not in df.columns:
         df = add_sentiment_analysis(df, model=params['sentiment_model'])
-    
+
     # Apply date filter if available
     if df['date'].notna().any():
         min_date = df['date'].min()
         max_date = df['date'].max()
-        
+
         if pd.notna(min_date) and pd.notna(max_date):
             try:
                 st.sidebar.markdown("---")
@@ -466,10 +512,10 @@ def main():
                 df = apply_date_filter(df, date_range)
             except Exception as e:
                 st.sidebar.warning(f"Date filter unavailable: {str(e)}")
-    
+
     # Calculate sentiment statistics
     stats = calculate_sentiment_statistics(df)
-    
+
     # Determine sender column (use anonymized)
     sender_col = 'sender_anon' if ANONYMIZE_BY_DEFAULT else 'sender_clean'
     
